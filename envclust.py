@@ -277,22 +277,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('fasta_file',
         metavar='in.fasta',
-        type=str,
         help="input sequences in aligned FASTA format")
     parser.add_argument('count_file',
         metavar='in.count',
-        type=str,
         help="input data table file of sequence counts. Data should be in the "
             "form species x sites, where rows represent sequence IDs and "
             "columns represent distinct samples")
+    parser.add_argument('-o', '--out',
+        metavar='out.tsv',
+        help="output tab-delimited OTU table")
     parser.add_argument('-v', '--verbose', 
         action='count', 
         default=0,
         help="increase output verbosity")
     parser.add_argument('-c', '--correction',
-        default='jc69',
+        default='hamming',
         choices=['jc69', 'k80', 'hamming'],
-        dest='dist_corr',
+        dest='dist_method',
         help="distance model for calculating distance between sequences "
             "[default: hamming]. Options are Jukes-Cantor '69 (jc69), Kimura "
             "'80 (k80), or Hamming (hamming)")
@@ -315,13 +316,6 @@ def main():
         help="p value cutoff for determining whether to reject the null "
             "hypothesis that the distribution of two sequences are "
             "statistically similar [default: 0.05]")
-    parser.add_argument('-f', '--format',  #add biom compatibility 
-        type=str,
-        default='txt',
-        choices=['list', 'txt'],
-        dest='out_format',
-        help="output format. Options are a mothur-formatted list or classic, "
-            "tab-delim otu table [default: txt]")
     parser.add_argument('--version', 
         action='version',
         version='%(prog)s ' + __version__)
@@ -333,6 +327,12 @@ def main():
         if not in_access:
             print(in_reason)
             sys.exit(1)
+
+    outfile = args.out
+    out_access, out_reason = file_check(outfile, 'w')
+    if not out_access:
+        print(out_reason)
+        sys.exit(1)
        
     max_dist = args.max_dist
     if max_dist <= 0 or max_dist > 1:
@@ -346,9 +346,9 @@ def main():
             file=sys.stderr)
         sys.exit(1)
 
-    if args.dist_corr == 'jc69':
+    if args.dist_method == 'jc69':
         correction_method = distance_jc69
-    elif args.dist_corr == 'k80':
+    elif args.dist_method == 'k80':
         correction_method = distance_k80
 #    else:
 #        correction_method = distance_hamming
@@ -442,35 +442,21 @@ def main():
         else:
             in_name = args.fasta_file
 
-    if args.out_format == "mothur_list":
-        out_file = in_name + '.list'
-    elif args.out_format == "otu_text":
-        out_file = in_name + '_otu.txt'
-
-    out_access, out_reason = file_check(out_file, 'w')
-    if not out_access:
-        print(out_reason)
-        sys.exit(1)
-
-    message = "Finished processing sequences\nWriting OTUs to " + out_file
+    message = "Finished processing sequences.\nWriting OTUs to '{}'.".format(out_file)
     verbosity(args.verbose, message)
 
     fill = len(str(num_otus))
     otu_names = ['eOTU' + str(i).zfill(fill) for i in range(1, int(num_otus) \
         + 1)]
-    with open(out_file, 'w') as out:
-        if out_file.endswith(".txt"):
-            position = 0
-            for otu_rep in otu_dict.keys():
-                output = otu_names[position] + '\t' + '\t'.join(otu_dict[otu_rep]) + '\n'
-                out.write(output)
-                position += 1
-        elif out_file.endswith(".list"):
-            output_list = ["dist", str(num_otus)]
-            for otu_rep in otu_dict.keys():
-                output_list.append(','.join(otu_dict[otu_rep]))
 
-            output = '\t'.join(output_list)
+    with open(outfile, 'w') as out_h:
+
+        position = 0
+        for otu_rep in otu_dict.keys():
+            position += 1
+
+            output = '{}\t{}\n'.format(otu_names[position], \
+                '\t'.join(otu_dict[otu_rep]))
             out.write(output)
 
 if __name__ == '__main__':
