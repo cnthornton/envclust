@@ -1,8 +1,6 @@
 #! /usr/bin/env python3
-"""
-    parser = argparse.ArgumentParser(description="Cluster amplicons using "
-        "distribution patterns to inform OTU generation")
-Cluster amplicon sequencing reads based on their sample distribution.
+"""Cluster amplicon sequences using distribution patterns across samples to 
+inform OTU generation.
 """
 
 from __future__ import print_function, division
