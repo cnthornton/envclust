@@ -9,7 +9,7 @@ __author__ = 'Christopher Thornton'
 __license__ = 'GPLv3'
 __date__ = '2019-10-08'  #project initiation: 2014-07-23
 __status__ = "Beta"
-__version__ = '0.2.5'
+__version__ = '0.3.0'
 
 import argparse
 from math import log
