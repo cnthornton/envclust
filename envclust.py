@@ -6,8 +6,10 @@ inform OTU generation.
 from __future__ import print_function, division
 
 __author__ = 'Christopher Thornton'
+__license__ = 'GPLv3'
 __date__ = '2019-10-08'  #project initiation: 2014-07-23
-__version__ = '0.2.1'
+__status__ = "Beta"
+__version__ = '0.2.5'
 
 import argparse
 from math import log
@@ -15,7 +17,6 @@ import os
 import random
 from scipy.stats import *
 import sys
-
 
 def verbosity(verbose, string):
     if verbose:
@@ -304,28 +305,32 @@ def main():
         default=0,
         help="increase output verbosity")
     parser.add_argument('-d', '--distance',
-        default='hamming',
-        choices=['jc69', 'k80', 'hamming'],
         dest='dist_method',
+        metavar='METHOD',
+        choices=['jc69', 'k80', 'hamming'],
+        default='hamming',
         help="model for calculating distance between sequences [default: "
             "hamming]. Options are Jukes-Cantor '69 (jc69), Kimura '80 (k80), "
             "or Hamming (hamming)")
     parser.add_argument('-i', '--iter',
         type=int,
-        default=10000,
         dest='num_iters',
+        metavar='INT',
+        default=10000,
         help="number of iterations to use when performing a Monte-carlo "
             "simulation if required for the chi-square test [default: 10000]")
     parser.add_argument('-m', '--max', 
         type=float, 
-        default=0.10, 
+        metavar='DISTANCE',
         dest='max_dist', 
-        help="maximum genetic variation for sequences allowed within a "
-            "populaion/cluster [default: 0.10]")
+        default=0.10, 
+        help="maximum genetic variation allowed between sequences in a "
+            "population/cluster [default: 0.10]")
     parser.add_argument('-p', '--p', 
         type=float, 
-        default=0.05, 
         dest='p_cutoff', 
+        metavar='THRESHOLD',
+        default=0.05, 
         help="p-value cutoff for determining whether to reject the null "
             "hypothesis that the distribution of two sequences are "
             "statistically similar [default: 0.05]")
@@ -374,6 +379,7 @@ def main():
     sorted_abunds = sort_by_last(abunds, True)
     seqs_processed = 0
     num_seqs = len(sorted_abunds)
+    num_otus = 0
     for candidate in sorted_abunds:
         otu_reps = otu_dict.keys()
         cand_id, cand_abund = candidate
@@ -419,28 +425,29 @@ def main():
 
         # Create OTU with candidate sequence as the representative sequence if
         # distribution is sufficiently unique
-        if not added:  
+        if not added:
+            num_otus += 1
+            message = 'OTUs created: ' + str(num_otus)
+            verbosity(args.verbose, message)
+
             otu_dict[cand_id] = [cand_id]
             message = "Creating cluster with '{}' as the representative"\
                 .format(cand_id)
             verbosity(args.verbose, message)
 
-        num_otus = len(otu_dict.keys())
-        message = 'OTUs created: ' + str(num_otus)
-        verbosity(args.verbose, message)
-
+        # Output current status
         seqs_processed += 1
         completion = int((seqs_processed / num_seqs) * 100)
         message = 'Percentage of sequence processed: {!s}%\n'.format(completion)
         verbosity(args.verbose, message)
 
-    # Output run information
-#    largest = 0
-#    smallest = 0
+    # Output information on run
+    largest = max([len(otu_dict[i]) for i in otu_dict])
+    smallest = min([len(otu_dict[j]) for j in otu_dict])
     print('Total OTUs: {!s}'.format(num_otus), file=sys.stderr)
     print('Sequences processed: {!s}'.format(seqs_processed), file=sys.stderr)
-#    print('Size of largest cluster: {!s}'.format(largest), file=sys.stderr)
-#    print('Size of smallest cluster: {!s}'.format(smallest), file=sys.stderr)
+    print('Size of largest cluster: {!s}'.format(largest), file=sys.stderr)
+    print('Size of smallest cluster: {!s}'.format(smallest), file=sys.stderr)
     
     # Write clusters to file
     message = "Finished processing sequences.\nWriting OTUs to '{}'."\
