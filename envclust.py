@@ -97,7 +97,9 @@ def sort_by_last(tuple_list, direction):
     return sorted_list
     
 def distance_jc69(cand, rep):
-    """Calculate the Jukes-Cantor corrected distance between sequences."""
+    """Calculate the Jukes-Cantor corrected distance between a pair of 
+    sequences.
+    """
     num_diff = 0 #count for number of differences in bases between seqs
 
     for base in range(len(cand)): #each gap is penalized when calculating distance
@@ -113,7 +115,8 @@ def distance_jc69(cand, rep):
     return distance
 
 def distance_k80(cand, rep):
-    """Calculate the Kimura corrected distance between sequences.""" 
+    """Calculate the Kimura corrected distance between a pair of sequences.
+    """ 
     ps = 0 #bases that show transitional changes
     qs = 0 #bases that show transversional changes
 
@@ -136,7 +139,15 @@ def distance_k80(cand, rep):
 
     return distance
 
-# Add hamming distance function
+def hamming_distance(cand, rep):
+    """Calculate the Hamming distance between a pair of sequences.
+    """
+    #Return Hamming distance between equal-length sequences
+    if len(cand) != len(rep):
+        raise ValueError("Template and sequence index barcodes must of equal "
+            "length")
+
+    return sum(ch1 != ch2 for ch1, ch2 in zip(cand, rep))
 
 def compare_distributions(cand, rep, iters):
     """Compare distributions to determine if they are significantly different.
@@ -229,8 +240,8 @@ def simulate_chisq(obs, chisq_obs, iters):
     return p
 
 def table_counts(contingency_table):
-    """Return information about the contigency table created from candidate \
-    and represetative distributions for use in other fuctions.
+    """Obtain summary information about contingency table created from \
+    candidate and representative distributions.
     """
     num_rows = len(contingency_table)
     num_columns = len(contingency_table[0])
@@ -251,7 +262,7 @@ def table_counts(contingency_table):
 def check_cells(exp_table):
     """Verify that 80% of cells in the expected table have values of five or \
     more and that the smallest expected value is at least one. If not, \
-    perform monte carlo simulation.
+    recommend Monte carlo simulation.
     """
     simulate = False
     count = 0
@@ -284,19 +295,21 @@ def main():
             "form species x sites, where rows represent sequence IDs and "
             "columns represent distinct samples")
     parser.add_argument('-o', '--out',
+        default = sys.stdout,
         metavar='out.tsv',
-        help="output tab-delimited OTU table")
+        help="output tab-delimited OTU table to file [default: output to "
+            "stdout]")
     parser.add_argument('-v', '--verbose', 
         action='count', 
         default=0,
         help="increase output verbosity")
-    parser.add_argument('-c', '--correction',
+    parser.add_argument('-d', '--distance',
         default='hamming',
         choices=['jc69', 'k80', 'hamming'],
         dest='dist_method',
-        help="distance model for calculating distance between sequences "
-            "[default: hamming]. Options are Jukes-Cantor '69 (jc69), Kimura "
-            "'80 (k80), or Hamming (hamming)")
+        help="model for calculating distance between sequences [default: "
+            "hamming]. Options are Jukes-Cantor '69 (jc69), Kimura '80 (k80), "
+            "or Hamming (hamming)")
     parser.add_argument('-i', '--iter',
         type=int,
         default=10000,
@@ -309,18 +322,20 @@ def main():
         dest='max_dist', 
         help="maximum genetic variation for sequences allowed within a "
             "populaion/cluster [default: 0.10]")
-    parser.add_argument('-p', '--p-cutoff', 
+    parser.add_argument('-p', '--p', 
         type=float, 
         default=0.05, 
         dest='p_cutoff', 
-        help="p value cutoff for determining whether to reject the null "
+        help="p-value cutoff for determining whether to reject the null "
             "hypothesis that the distribution of two sequences are "
             "statistically similar [default: 0.05]")
     parser.add_argument('--version', 
         action='version',
         version='%(prog)s ' + __version__)
+
     args = parser.parse_args()
 
+    # Check program parameters
     in_files = [args.fasta_file, args.count_file]
     for in_file in in_files:
         in_access, in_reason = file_check(in_file, 'rU')
@@ -350,8 +365,8 @@ def main():
         correction_method = distance_jc69
     elif args.dist_method == 'k80':
         correction_method = distance_k80
-#    else:
-#        correction_method = distance_hamming
+    else:
+        correction_method = distance_hamming
 
     otu_dict = {}
     seq_dict = fasta_parse(args.fasta_file)
@@ -364,7 +379,7 @@ def main():
         cand_id, cand_abund = candidate
         cand_seq = seq_dict[cand_id]
 
-        message = 'Selecting ' + cand_id + ' as candidate sequence'
+        message = 'Selecting {} as candidate sequence'.format(cand_id)
         verbosity(args.verbose, message)
 
         rep_distances = []
@@ -379,8 +394,7 @@ def main():
                 dist_tuple = (rep_id, distance)
                 rep_distances.append(dist_tuple)
         
-        # Compare the distributions between candidate and OTU representative 
-        # sequences
+        # Compare distributions between candidate and OTU representative seqs
         sorted_reps = sort_by_last(rep_distances, False)
         added = False
         for rep in sorted_reps:
@@ -390,12 +404,13 @@ def main():
             obs_table = (cand_dist, rep_dist)
             p_value = compare_distributions(cand_dist, rep_dist, args.num_iters)
 
-            # Add the candidate to the rep's OTU if the distributions match
+            # Add candidate to representative's OTU if distributions match
             if p_value >= p_cutoff:
-                message = 'Adding ' + cand_id + ' to ' + rep_id + ' OTU'
+                message = "Adding '{}' to cluster represented by '{}'"\
+                    .format(cand_id, rep_id)
                 verbosity(args.verbose, message)
 
-                message = 'P-value: ' + str(p_value)
+                message = 'p-value: ' + str(p_value)
                 verbosity(args.verbose, message)
 
                 otu_dict[rep_id].append(cand_id)
@@ -403,10 +418,11 @@ def main():
                 break
 
         # Create OTU with candidate sequence as the representative sequence if
-        # its distribution is not similar to any OTU rep's distribution
+        # distribution is sufficiently unique
         if not added:  
             otu_dict[cand_id] = [cand_id]
-            message = 'Creating OTU with ' + cand_id + ' as representative'
+            message = "Creating cluster with '{}' as the representative"\
+                .format(cand_id)
             verbosity(args.verbose, message)
 
         num_otus = len(otu_dict.keys())
@@ -415,48 +431,35 @@ def main():
 
         seqs_processed += 1
         completion = int((seqs_processed / num_seqs) * 100)
-        message = 'Percentage of sequence processed: ' + str(completion) + '%\n'
+        message = 'Percentage of sequence processed: {!s}%\n'.format(completion)
         verbosity(args.verbose, message)
 
-    # Write to log
-    log_file = str(args.fasta_file) + '.log'
-    log_access, log_reason = file_check(log_file, 'w')
-
-    if not log_access:
-        print(log_reason)
-        sys.exit(1)
-
-    otus = 'Total OTUs: ' + str(num_otus)
-    total_seqs = 'Number of sequences processed: ' + str(seqs_processed)
-    largest = 'Size of largest cluster: '
-    smallest = 'Size of smallest cluster: '
-    with open(log_file, 'w') as log:
-        log.write(total_seqs + '\n' + otus + '\n' + largest + '\n' + smallest)
+    # Output run information
+#    largest = 0
+#    smallest = 0
+    print('Total OTUs: {!s}'.format(num_otus), file=sys.stderr)
+    print('Sequences processed: {!s}'.format(seqs_processed), file=sys.stderr)
+#    print('Size of largest cluster: {!s}'.format(largest), file=sys.stderr)
+#    print('Size of smallest cluster: {!s}'.format(smallest), file=sys.stderr)
     
     # Write clusters to file
-    fasta_extensions = ('.fa', '.fna', '.fasta')
-    for extension in fasta_extensions:
-        if args.fasta_file.endswith(extension):
-            in_name = '.'.join(args.fasta_file.split('.')[:-1])
-            break
-        else:
-            in_name = args.fasta_file
-
-    message = "Finished processing sequences.\nWriting OTUs to '{}'.".format(out_file)
+    message = "Finished processing sequences.\nWriting OTUs to '{}'."\
+        .format(outfile)
     verbosity(args.verbose, message)
 
     fill = len(str(num_otus))
-    otu_names = ['eOTU' + str(i).zfill(fill) for i in range(1, int(num_otus) \
-        + 1)]
+    otu_names = ['eOTU{}'.format(str(i).zfill(fill)) for i in \
+        range(1, int(num_otus) + 1)]
 
     with open(outfile, 'w') as out_h:
 
         position = 0
-        for otu_rep in otu_dict.keys():
+        for cluster_rep in otu_dict:
             position += 1
+            rep_name = otu_names[position]
+            members = '\t'.join(otu_dict[cluster_rep])
 
-            output = '{}\t{}\n'.format(otu_names[position], \
-                '\t'.join(otu_dict[otu_rep]))
+            output = '{}\t{}\n'.format(rep_name, members)
             out.write(output)
 
 if __name__ == '__main__':
