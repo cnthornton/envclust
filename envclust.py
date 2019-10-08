@@ -1,82 +1,23 @@
 #! /usr/bin/env python3
 """
-Performs clustering of reads based on their distribution throughout 
-environmental samples.
+    parser = argparse.ArgumentParser(description="Cluster amplicons using "
+        "distribution patterns to inform OTU generation")
+Cluster amplicon sequencing reads based on their sample distribution.
 """
 
 from __future__ import print_function, division
 
 __author__ = 'Christopher Thornton'
-__date__ = '2014-07-23'
-__version__ = '0.2'
+__date__ = '2019-10-08'  #project initiation: 2014-07-23
+__version__ = '0.2.1'
 
-import sys
-import os
 import argparse
-import random
 from math import log
+import os
+import random
 from scipy.stats import *
+import sys
 
-###############################################################################
-#                                                                             #
-#                                  Functions                                  #
-#                                                                             #
-###############################################################################
-
-def opt_parser():
-    """Obtain options from the command line."""
-    parser = argparse.ArgumentParser(
-        description="Cluster amplicons using distribution patterns to inform "
-        "OTU generation.")
-    parser.add_argument('fasta_file', 
-                        type=str,
-                        help="input sequences in aligned FASTA format")
-    parser.add_argument('count_file', 
-                        type=str,
-                        help="input data table file of sequence counts. Data "
-                        "should be in the form species x sites, where rows "
-                        "represent sequence IDs and columns represent distinct samples")
-    parser.add_argument('-v', '--verbose', 
-                        action='count', 
-                        default=0,
-                        help="increase output verbosity")
-    parser.add_argument('-c', '--correction',
-                        default='jc69',
-                        choices=['jc69', 'k80'],
-                        dest='dist_corr',
-                        help="distance model to use when calculating "
-                        "distance between sequences [default: jc69]")
-    parser.add_argument('-i', '--iter',
-                        type=int,
-                        default=10000,
-                        dest='num_iters',
-                        help="number of iterations to use when performing a "
-                        "monte-carlo simulation if required for the chi-square " 
-                        "test [default: 10000]")
-    parser.add_argument('-m', '--max', 
-                        type=float, 
-                        default=0.10, 
-                        dest='max_dist', 
-                        help="maximum genetic variation for sequences to be "
-                        "allowed within the same population [default: 0.10]")
-    parser.add_argument('-p', '--p-cutoff', 
-                        type=float, 
-                        default=0.05, 
-                        dest='p_cutoff', 
-                        help="p value cutoff for determining whether to reject "
-                        "the null hypothesis that the distribution of two "
-                        "sequences are statistically similar [default: 0.05]")
-    parser.add_argument('-f', '--format', #add biom compatibility 
-                        type=str,
-                        default='txt',
-                        choices=['list', 'txt'],
-                        dest='out_format',
-                        help="output format. Options are a mothur-formatted "
-                        "list or classic, tab-delim otu table [default: txt]")
-    parser.add_argument('--version', 
-                        action='version',
-                        version='%(prog)s ' + __version__)
-    return parser
 
 def verbosity(verbose, string):
     if verbose:
@@ -304,7 +245,59 @@ def check_cells(exp_table):
     return simulate
 
 def main():
-    args = opt_parser().parse_args()
+    parser = argparse.ArgumentParser(description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('fasta_file',
+        metavar='in.fasta',
+        type=str,
+        help="input sequences in aligned FASTA format")
+    parser.add_argument('count_file',
+        metavar='in.count',
+        type=str,
+        help="input data table file of sequence counts. Data should be in the "
+            "form species x sites, where rows represent sequence IDs and "
+            "columns represent distinct samples")
+    parser.add_argument('-v', '--verbose', 
+        action='count', 
+        default=0,
+        help="increase output verbosity")
+    parser.add_argument('-c', '--correction',
+        default='jc69',
+        choices=['jc69', 'k80'],
+        dest='dist_corr',
+        help="distance model to use when calculating distance between "
+            "sequences [default: jc69]")
+    parser.add_argument('-i', '--iter',
+        type=int,
+        default=10000,
+        dest='num_iters',
+        help="number of iterations to use when performing a monte-carlo "
+            "simulation if required for the chi-square test [default: 10000]")
+    parser.add_argument('-m', '--max', 
+        type=float, 
+        default=0.10, 
+        dest='max_dist', 
+        help="maximum genetic variation for sequences to be allowed within "
+            "the same population [default: 0.10]")
+    parser.add_argument('-p', '--p-cutoff', 
+        type=float, 
+        default=0.05, 
+        dest='p_cutoff', 
+        help="p value cutoff for determining whether to reject the null "
+            "hypothesis that the distribution of two sequences are "
+            "statistically similar [default: 0.05]")
+    parser.add_argument('-f', '--format', #add biom compatibility 
+        type=str,
+        default='txt',
+        choices=['list', 'txt'],
+        dest='out_format',
+        help="output format. Options are a mothur-formatted list or classic, "
+            "tab-delim otu table [default: txt]")
+    parser.add_argument('--version', 
+        action='version',
+        version='%(prog)s ' + __version__)
+    args = parser.parse_args()
+
     in_files = [args.fasta_file, args.count_file]
     for in_file in in_files:
         in_access, in_reason = file_check(in_file, 'rU')
@@ -427,13 +420,7 @@ def main():
             output = '\t'.join(output_list)
             out.write(output)
 
-##############################################################################
-#                                                                            #
-#                                    Main                                    #
-#                                                                            #
-##############################################################################
 
 if __name__ == '__main__':
     main()
-
-sys.exit(0)
+    sys.exit(0)
