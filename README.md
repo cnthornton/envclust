@@ -1,2 +1,2 @@
 # EnvClust
-Tool for performing distribution-based clustering on amplicon sequence datasets
+Distribution-based clustering for organizing amplicon sequence data into ecologically-relevant units (eOTUs).
